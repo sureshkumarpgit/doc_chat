@@ -1,0 +1,9 @@
+langchain==0.3.7
+langchain-openai
+langchain-community
+faiss-cpu
+streamlit
+pypdf
+python-dotenv
+tiktoken
+langchain-text-splitters
