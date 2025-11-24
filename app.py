@@ -18,8 +18,22 @@ Upload your documents (PDF or TXT) to create a knowledge base and ask questions!
 # Sidebar for configuration and file upload
 with st.sidebar:
     st.header("Configuration")
-    api_key = st.text_input("OpenAI API Key", type="password", value=os.getenv("OPENAI_API_KEY", ""))
     
+    provider = st.radio("Model Provider", ["OpenAI", "Azure OpenAI"])
+    
+    config = {"provider": provider}
+    
+    if provider == "OpenAI":
+        api_key = st.text_input("OpenAI API Key", type="password", value=os.getenv("OPENAI_API_KEY", ""))
+        config['api_key'] = api_key
+    else:
+        st.info("Azure OpenAI Configuration")
+        config['api_key'] = st.text_input("Azure API Key", type="password")
+        config['azure_endpoint'] = st.text_input("Azure Endpoint", placeholder="https://your-resource.openai.azure.com/")
+        config['azure_api_version'] = st.text_input("API Version", value="2023-05-15")
+        config['azure_llm_deployment'] = st.text_input("LLM Deployment Name", placeholder="e.g., gpt-4")
+        config['azure_embedding_deployment'] = st.text_input("Embedding Deployment Name", placeholder="e.g., text-embedding-ada-002")
+
     st.header("Knowledge Base")
     uploaded_files = st.file_uploader("Upload Documents", type=["pdf", "txt"], accept_multiple_files=True)
     
@@ -44,7 +58,7 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 
 # Processing Logic
-if process_btn and uploaded_files and api_key:
+if process_btn and uploaded_files and config.get('api_key'):
     with st.spinner("Processing documents... This involves splitting text, vectorizing it, and building the index."):
         try:
             # Save uploaded files to temp dir to be read by loaders
@@ -57,7 +71,7 @@ if process_btn and uploaded_files and api_key:
                 file_paths.append(path)
             
             # Initialize Engine
-            st.session_state.rag_engine = RAGEngine(api_key)
+            st.session_state.rag_engine = RAGEngine(config)
             
             status = st.session_state.rag_engine.ingest_documents(file_paths, custom_prompt)
             st.success(status)
@@ -68,8 +82,8 @@ if process_btn and uploaded_files and api_key:
             
         except Exception as e:
             st.error(f"An error occurred: {e}")
-elif process_btn and not api_key:
-    st.warning("Please enter your OpenAI API Key.")
+elif process_btn and not config.get('api_key'):
+    st.warning("Please enter your API Key.")
 
 # Chat Interface
 for message in st.session_state.messages:

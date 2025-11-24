@@ -1,21 +1,31 @@
 import os
-from typing import List
+from typing import List, Dict, Any
 from langchain_community.document_loaders import PyPDFLoader, TextLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_openai import OpenAIEmbeddings
+from langchain_openai import OpenAIEmbeddings, AzureOpenAIEmbeddings
 from langchain_community.vectorstores import FAISS
-from langchain_openai import ChatOpenAI
+from langchain_openai import ChatOpenAI, AzureChatOpenAI
 from langchain.chains import RetrievalQA
 from langchain.docstore.document import Document
 from langchain.prompts import PromptTemplate
 
 class RAGEngine:
-    def __init__(self, api_key: str):
-        self.api_key = api_key
-        os.environ["OPENAI_API_KEY"] = self.api_key
-        self.embeddings = OpenAIEmbeddings()
+    def __init__(self, config: Dict[str, Any]):
+        self.config = config
         self.vector_store = None
         self.chain = None
+        
+        # Initialize Embeddings based on provider
+        if self.config['provider'] == 'Azure OpenAI':
+            self.embeddings = AzureOpenAIEmbeddings(
+                azure_deployment=self.config['azure_embedding_deployment'],
+                openai_api_version=self.config['azure_api_version'],
+                azure_endpoint=self.config['azure_endpoint'],
+                api_key=self.config['api_key']
+            )
+        else:
+            os.environ["OPENAI_API_KEY"] = self.config['api_key']
+            self.embeddings = OpenAIEmbeddings()
 
     def ingest_documents(self, file_paths: List[str], custom_prompt: str = None):
         """
@@ -41,11 +51,19 @@ class RAGEngine:
         chunks = text_splitter.split_documents(documents)
 
         # Vectorization and Indexing
-        # This step converts text chunks into vector embeddings and stores them in FAISS
         self.vector_store = FAISS.from_documents(chunks, self.embeddings)
         
-        # Initialize the Retrieval Chain
-        llm = ChatOpenAI(model_name="gpt-4o", temperature=0)
+        # Initialize LLM based on provider
+        if self.config['provider'] == 'Azure OpenAI':
+            llm = AzureChatOpenAI(
+                azure_deployment=self.config['azure_llm_deployment'],
+                openai_api_version=self.config['azure_api_version'],
+                azure_endpoint=self.config['azure_endpoint'],
+                api_key=self.config['api_key'],
+                temperature=0
+            )
+        else:
+            llm = ChatOpenAI(model_name="gpt-4o", temperature=0)
         
         # Define prompt
         if custom_prompt:
