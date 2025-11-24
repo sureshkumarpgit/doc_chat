@@ -9,6 +9,14 @@ load_dotenv()
 
 st.set_page_config(page_title="DocuChat RAG", page_icon="📚")
 
+# Initialize session state
+if "rag_engine" not in st.session_state:
+    st.session_state.rag_engine = None
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+if "reset_counter" not in st.session_state:
+    st.session_state.reset_counter = 0
+
 st.title("📚 DocuChat: Chat with your Documents")
 st.markdown("""
 This app demonstrates **Vectorization** and **Indexing**. 
@@ -35,7 +43,7 @@ with st.sidebar:
         config['azure_embedding_deployment'] = st.text_input("Embedding Deployment Name", placeholder="e.g., text-embedding-ada-002")
 
     st.header("Knowledge Base")
-    uploaded_files = st.file_uploader("Upload Documents", type=["pdf", "txt"], accept_multiple_files=True)
+    uploaded_files = st.file_uploader("Upload Documents", type=["pdf", "txt"], accept_multiple_files=True, key=f"file_uploader_{st.session_state.reset_counter}")
     
     st.header("Custom Prompt")
     default_prompt = """Use the following pieces of context to answer the question at the end. 
@@ -47,15 +55,26 @@ Context: {context}
 Question: {question}
 
 Helpful Answer:"""
-    custom_prompt = st.text_area("Define your prompt:", value=default_prompt, height=200)
+    custom_prompt = st.text_area("Define your prompt:", value=default_prompt, height=200, key=f"prompt_area_{st.session_state.reset_counter}")
     
     process_btn = st.button("Process Documents")
+    
+    st.divider()
+    
+    # Chat Controls
+    st.header("Chat Controls")
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("🗑️ Clear Chat"):
+            st.session_state.messages = []
+            st.rerun()
+    with col2:
+        if st.button("🔄 New Chat"):
+            st.session_state.messages = []
+            st.session_state.rag_engine = None
+            st.session_state.reset_counter += 1
+            st.rerun()
 
-# Initialize session state
-if "rag_engine" not in st.session_state:
-    st.session_state.rag_engine = None
-if "messages" not in st.session_state:
-    st.session_state.messages = []
 
 # Processing Logic
 if process_btn and uploaded_files and config.get('api_key'):
