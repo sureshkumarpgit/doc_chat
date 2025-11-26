@@ -1,32 +1,22 @@
 #!/bin/bash
-set -x  # Enable debug output
-exec 2>&1  # Redirect stderr to stdout so all output is captured
+set -e
 
-echo "Starting application..."
-echo "Python version:"
+echo "[STARTUP] Starting DocuChat application..."
+echo "[STARTUP] Current directory: $(pwd)"
+echo "[STARTUP] Python version:"
 python --version
+echo "[STARTUP] Python path: $(which python)"
 
-echo "Current directory:"
-pwd
-
-echo "Listing files:"
-ls -la
-
-echo "Installing/verifying dependencies..."
-pip install -r requirements.txt 2>&1 | tail -20
-
+# Create .streamlit directory if needed
 mkdir -p ~/.streamlit/
-echo "[general]
-email = \"\"
-passwordsRequired = false
-enableCORS = false
 
-[server]
-headless = true
-enableXsrfProtection = false
-port = ${PORT:-8000}
-" > ~/.streamlit/config.toml
+# Export environment variables
+export STREAMLIT_SERVER_HEADLESS=true
+export STREAMLIT_SERVER_PORT=${PORT:-8000}
+export STREAMLIT_SERVER_ADDRESS=0.0.0.0
 
-echo "Streamlit config created."
-echo "Starting Streamlit..."
-python -m streamlit run app.py --server.headless true
+echo "[STARTUP] PORT: $STREAMLIT_SERVER_PORT"
+echo "[STARTUP] Starting Streamlit..."
+
+# Run the Python wrapper
+python run.py

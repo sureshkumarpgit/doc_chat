@@ -1,1 +1,2 @@
 [config]
+command = bash startup.sh
