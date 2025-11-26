@@ -2,6 +2,13 @@ FROM python:3.13.8-slim
 
 WORKDIR /app
 
+# Install build dependencies needed for compilation
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    gcc \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
+
 # Copy requirements first for better caching
 COPY requirements.txt .
 
