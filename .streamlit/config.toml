@@ -1,0 +1,9 @@
+[general]
+email = ""
+passwordsRequired = false
+enableCORS = false
+
+[server]
+headless = true
+enableXsrfProtection = false
+port = 8000
