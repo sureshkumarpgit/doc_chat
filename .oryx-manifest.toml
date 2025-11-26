@@ -1,0 +1,10 @@
+[build]
+name = "streamlit"
+version = "1.0"
+
+[runtime]
+name = "python"
+version = "3.13"
+
+[detect]
+type = "streamlit"
