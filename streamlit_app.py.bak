@@ -1,0 +1,126 @@
+import streamlit as st
+import os
+import tempfile
+from rag_engine import RAGEngine
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+st.set_page_config(page_title="DocuChat RAG", page_icon="📚")
+
+# Initialize session state
+if "rag_engine" not in st.session_state:
+    st.session_state.rag_engine = None
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+if "reset_counter" not in st.session_state:
+    st.session_state.reset_counter = 0
+
+st.title("📚 DocuChat: Chat with your Documents")
+st.markdown("""
+This app demonstrates **Vectorization** and **Indexing**. 
+Upload your documents (PDF or TXT) to create a knowledge base and ask questions!
+""")
+
+# Sidebar for configuration and file upload
+with st.sidebar:
+    st.header("Configuration")
+    
+    provider = st.radio("Model Provider", ["OpenAI", "Azure OpenAI"])
+    
+    config = {"provider": provider}
+    
+    if provider == "OpenAI":
+        api_key = st.text_input("OpenAI API Key (will not be stored)", type="password", value="")
+        config['api_key'] = api_key
+    else:
+        st.info("Azure OpenAI Configuration")
+        config['api_key'] = st.text_input("Azure API Key", type="password")
+        config['azure_endpoint'] = st.text_input("Azure Endpoint", placeholder="https://your-resource.openai.azure.com/")
+        config['azure_api_version'] = st.text_input("API Version", value="2023-05-15")
+        config['azure_llm_deployment'] = st.text_input("LLM Deployment Name", placeholder="e.g., gpt-4")
+        config['azure_embedding_deployment'] = st.text_input("Embedding Deployment Name", placeholder="e.g., text-embedding-ada-002")
+
+    st.header("Knowledge Base")
+    uploaded_files = st.file_uploader("Upload Documents", type=["pdf", "txt"], accept_multiple_files=True, key=f"file_uploader_{st.session_state.reset_counter}")
+    
+    st.header("Custom Prompt")
+    default_prompt = """Use the following pieces of context to answer the question at the end. 
+If you don't know the answer, just say that you don't know, don't try to make up an answer. 
+Use three sentences maximum and keep the answer concise.
+
+Context: {context}
+
+Question: {question}
+
+Helpful Answer:"""
+    custom_prompt = st.text_area("Define your prompt:", value=default_prompt, height=200, key=f"prompt_area_{st.session_state.reset_counter}")
+    
+    process_btn = st.button("Process Documents")
+    
+    st.divider()
+    
+    # Chat Controls
+    st.header("Chat Controls")
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("🗑️ Clear Chat"):
+            st.session_state.messages = []
+            st.rerun()
+    with col2:
+        if st.button("🔄 New Chat"):
+            st.session_state.messages = []
+            st.session_state.rag_engine = None
+            st.session_state.reset_counter += 1
+            st.rerun()
+
+
+# Processing Logic
+if process_btn and uploaded_files and config.get('api_key'):
+    with st.spinner("Processing documents... This involves splitting text, vectorizing it, and building the index."):
+        try:
+            # Save uploaded files to temp dir to be read by loaders
+            temp_dir = tempfile.mkdtemp()
+            file_paths = []
+            for uploaded_file in uploaded_files:
+                path = os.path.join(temp_dir, uploaded_file.name)
+                with open(path, "wb") as f:
+                    f.write(uploaded_file.getbuffer())
+                file_paths.append(path)
+            
+            # Initialize Engine
+            st.session_state.rag_engine = RAGEngine(config)
+            
+            status = st.session_state.rag_engine.ingest_documents(file_paths, custom_prompt)
+            st.success(status)
+            
+            # Show the prompt being used
+            with st.expander("View Active System Prompt"):
+                st.text(st.session_state.rag_engine.get_current_prompt())
+            
+        except Exception as e:
+            st.error(f"An error occurred: {e}")
+elif process_btn and not config.get('api_key'):
+    st.warning("Please enter your API Key.")
+
+# Chat Interface
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+
+if prompt := st.chat_input("Ask a question about your documents..."):
+    # Add user message to chat history
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    with st.chat_message("user"):
+        st.markdown(prompt)
+
+    # Generate response
+    if st.session_state.rag_engine:
+        with st.chat_message("assistant"):
+            with st.spinner("Thinking..."):
+                response = st.session_state.rag_engine.get_response(prompt)
+                st.markdown(response)
+        st.session_state.messages.append({"role": "assistant", "content": response})
+    else:
+        st.warning("Please upload and process documents first.")
